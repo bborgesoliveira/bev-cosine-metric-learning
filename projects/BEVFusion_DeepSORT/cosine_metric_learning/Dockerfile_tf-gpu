@@ -1,0 +1,156 @@
+FROM nvidia/cuda:11.6.1-cudnn8-devel-ubuntu20.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG UBUNTU_VERSION=20.04
+
+ARG ARCH=
+ARG CUDA=11.6
+# ARCH and CUDA are specified again because the FROM directive resets ARGs
+# (but their default value is retained if set previously)
+ARG ARCH
+ARG CUDA
+ARG CUDNN=8.4.0.27-1
+ARG CUDNN_MAJOR_VERSION=8
+ARG LIB_DIR_PREFIX=x86_64
+ARG LIBNVINFER=7.2.2-1
+ARG LIBNVINFER_MAJOR_VERSION=7
+
+# Install system dependencies
+RUN apt-get update -y && apt-get install software-properties-common -y && \
+    add-apt-repository -y multiverse && apt-get update -y && apt-get upgrade -y && \
+    apt-get install -y\
+        apt-utils \
+        vim \
+        man \
+        build-essential \
+        wget \
+        sudo \
+        python3.8 \
+        python3-pip \
+        htop \
+        zlib1g-dev \
+        swig unzip \
+        libosmesa6-dev \
+        libgl1-mesa-glx \
+        libglfw3 \
+        patchelf \
+        git-all \
+        python3.8-dev&& \
+    rm -rf /var/lib/apt/lists/*
+
+# Needed for string substitution
+# SHELL ["/bin/bash", "-c"]
+# RUN apt-get update && apt-get install -y --no-install-recommends --allow-change-held-packages\
+#         build-essential \
+#         cuda-command-line-tools-${CUDA/./-} \
+#         libcublas-${CUDA/./-} \
+#         cuda-nvrtc-${CUDA/./-} \
+#         libcufft-${CUDA/./-} \
+#         libcurand-${CUDA/./-} \
+#         libcusolver-${CUDA/./-} \
+#         libcusparse-${CUDA/./-} \
+#         curl \
+#         libcudnn8=${CUDNN}+cuda${CUDA} \
+#         libfreetype6-dev \
+#         libhdf5-serial-dev \
+#         libzmq3-dev \
+#         pkg-config \
+#         software-properties-common \
+#         unzip
+
+# ARG TENSORRT=nv-tensorrt-local-repo-ubuntu2004-8.6.1-cuda-11.8_1.0-1_amd64.deb
+
+# # From Tensort installation instructions
+# ARG TENSORRT_KEY=/var/nv-tensorrt*/*.pub
+
+# # custom Tensorrt Installation
+# ADD $TENSORRT /tmp
+
+# # Rename the ML repo to something else so apt doesn't see it
+# RUN 	dpkg -i /tmp/$TENSORRT && \ 
+#     apt-key add $TENSORRT_KEY && \
+#     cp /var/nv-tensorrt-local-repo-ubuntu2004-8.6.1-cuda-11.8/*keyring.gpg /usr/share/keyrings/ && \
+#     apt-get update && apt-get install -y \
+#     tensorrt
+
+# Install TensorRT if not building for PowerPC
+# NOTE: libnvinfer uses cuda11.1 versions
+# RUN [[ "${ARCH}" = "ppc64le" ]] || { apt-get update && \
+#         apt-get install -y --no-install-recommends libnvinfer${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda11.1 \
+#         libnvinfer-plugin${LIBNVINFER_MAJOR_VERSION}=${LIBNVINFER}+cuda11.1 \
+#         && apt-get clean \
+#         && rm -rf /var/lib/apt/lists/*; }
+
+# For CUDA profiling, TensorFlow requires CUPTI.
+# ENV LD_LIBRARY_PATH /usr/local/cuda11.6/extras/CUPTI/lib64:/usr/local/cuda11.6/lib64:$LD_LIBRARY_PATH
+
+# # Link the libcuda stub to the location where tensorflow is searching for it and reconfigure
+# # dynamic linker run-time bindings
+# RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 \
+#     && echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/z-cuda-stubs.conf \
+#     && ldconfig
+
+ENV PATH ./.local/bin:$PATH
+ENV PATH ./.local/lib:$PATH
+ENV PATH ./.local/lib/python3.8/site-packages/nvidia/bin:$PATH
+ENV LD_LIBRARY_PATH ./.local/lib/python3.8/site-packages/tensorrt_libs:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH /usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+# Some TF tools expect a "python" binary
+#RUN ln -s $(which python3) /usr/local/bin/python
+
+ENV LANG C.UTF-8
+
+RUN python3 -m pip --no-cache-dir install --upgrade \
+    "pip<20.3" \
+    setuptools
+
+# Install any python packages you need
+COPY requirements.txt requirements.txt
+
+# Upgrade pip. Install distutils to avoid error during pip install upgrade in python3.7
+RUN python3 -m pip install --upgrade pip
+
+RUN python3 -m pip install -r requirements.txt
+
+#CUDA Variables
+# ENV CUDA_HOME /usr/local/cuda
+# ENV CPATH /usr/local/cuda/include
+# ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+# Install PyTorch and torchvision
+RUN pip3 install torch torchvision torchaudio -f https://download.pytorch.org/whl/nvidia-cudnn-cu11/torch_stable.html
+
+ARG uid=2000
+ARG user
+RUN echo /$user $uid
+RUN useradd -d /$user -u $uid $user --shell /bin/bash
+USER $user
+
+# Set the working directory
+#WORKDIR /app
+
+WORKDIR /$user/cosine_metric_learning
+ENV PYTHONPATH /$user/cosine_metric_learning
+
+# ENV PATH /$user/.local/bin:$PATH
+# ENV PATH /$user/.local/lib:$PATH
+ENV LC_ALL C.UTF-8
+
+ENV HOME /$user/cosine_metric_learning
+ENV DATA_FOLDER data
+
+# ENV CUDA_PATH /usr/local/cuda-11.6
+# ENV CUDA_INCLUDE_PATH /usr/local/cuda-11.6/include
+# ENV CUDA_LIBRARY_PATH /usr/local/cuda-11.6/lib64
+# ENV CUDA_HOME /usr/local/cuda-11.6
+# ENV CPATH /usr/local/cuda-11.6/include
+# ENV LD_LIBRARY_PATH /usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+# ENV PATH /usr/local/cuda-11.6/bin$:$PATH
+# RUN export PATH=/usr/lib/x86_64-linux-gnu${PATH:+:${PATH}}
+# RUN export CUDA_HOME=/usr/local/cuda-11.6
+# RUN export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+# Set the entrypoint
+#ENTRYPOINT [ "python3" ]
