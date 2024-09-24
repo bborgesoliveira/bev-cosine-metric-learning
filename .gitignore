@@ -165,3 +165,12 @@ cython_debug/
 .nv/
 *.deb
 .git_backup/
+.vscode/
+.vscode-server/
+work_dirs/
+mmcv/
+eval_output/
+*.pt
+runs/
+#Arquivos numpy (tensor)
+*.npy 
