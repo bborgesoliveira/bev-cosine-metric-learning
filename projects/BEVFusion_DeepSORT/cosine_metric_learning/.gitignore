@@ -159,18 +159,26 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+
 .cache/
+.config/
+.dotnet/
+.gnupg/
 .keras/
 .local/
 .nv/
-*.deb
-.git_backup/
-.vscode/
+.ssh/
 .vscode-server/
-work_dirs/
-mmcv/
 eval_output/
-*.pt
+from_bevfusion.egg-info/
+mmcv/
+output/
+*.deb
+*.pt  
+#REMOVER: BACKUP DOS DADOS DO GITHUB ORIGINAL
+.git_backup/   
+.vscode/
+work_dirs/
 runs/
 #Arquivos numpy (tensor)
-*.npy 
+*.npy      
